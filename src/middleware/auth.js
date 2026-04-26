@@ -16,7 +16,7 @@ const verifyToken = (req, res, next) => {
 
 // Cek apakah Admin
 const isAdmin = (req, res, next) => {
-  if (req.user.role !== 'ADMIN') return res.status(403).json({ message: "Akses ditolak, khusus Admin" });
+  if (req.user.role !== 'admin') return res.status(403).json({ message: "Akses ditolak, khusus Admin" });
   next();
 };
 

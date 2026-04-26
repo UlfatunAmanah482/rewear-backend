@@ -1,70 +1,74 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Ambil semua produk
+// 1. Ambil semua produk (Urutkan dari yang terbaru)
 exports.getAllProducts = async (req, res) => {
-  const products = await prisma.product.findMany();
-  res.json(products);
-};
-
-exports.getProductById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(id) },
+    const products = await prisma.product.findMany({
+      orderBy: { createdAt: 'desc' },
       include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-            phone: true
-          }
-        }
+        user: { select: { name: true, role: true } }
       }
     });
-
-    if (!product) {
-      return res.status(404).json({ message: "Produk tidak ditemukan" });
-    }
-
-    res.json(product);
+    res.json(products);
   } catch (err) {
-    console.error("Error getProductById:", err);
-    res.status(500).json({ message: "Gagal mengambil detail produk", error: err.message });
+    res.status(500).json({ message: "Gagal mengambil produk" });
   }
 };
 
-// Tambah Produk
-exports.createProduct = async (req, res) => {
-  const { title, description, price, category, image, address } = req.body;
-  const product = await prisma.product.create({
-    data: { title, description, price: parseFloat(price), category, image, address, userId: req.user.id }
-  });
-  res.json(product);
+// 2. Ambil detail produk
+exports.getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        user: { select: { name: true, email: true, phone: true } }
+      }
+    });
+
+    if (!product) return res.status(404).json({ message: "Produk tidak ditemukan" });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: "Gagal mengambil detail produk" });
+  }
 };
 
-// Update Produk (Bisa oleh pemilik atau Admin)
+// 3. Tambah Produk
+exports.createProduct = async (req, res) => {
+  try {
+    const { title, description, price, category, image, address } = req.body;
+    const product = await prisma.product.create({
+      data: { 
+        title, 
+        description, 
+        price: parseFloat(price), 
+        category, 
+        image, 
+        address, 
+        userId: req.user.id 
+      }
+    });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: "Gagal menambah produk" });
+  }
+};
+
+// 4. Update Produk (Oleh Pemilik atau Admin)
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, price, category, image } = req.body;
 
-    // 1. Cari produknya dulu
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
+    if (!product) return res.status(404).json({ message: "Produk tidak ditemukan" });
 
-    if (!product) {
-      return res.status(404).json({ message: "Produk tidak ditemukan" });
-    }
-
-    // 2. Cek Keamanan: Apakah yang edit adalah pemiliknya atau seorang ADMIN?
-    if (product.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    // LOGIKA KEAMANAN: Pemilik atau ADMIN
+    if (product.userId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: "Anda tidak memiliki akses untuk mengedit produk ini" });
     }
 
-    // 3. Lakukan Update
     const updatedProduct = await prisma.product.update({
       where: { id: parseInt(id) },
       data: {
@@ -72,33 +76,44 @@ exports.updateProduct = async (req, res) => {
         description: description || product.description,
         price: price ? parseFloat(price) : product.price,
         category: category || product.category,
-        image: image || product.image
+        image: image || product.image,
       }
     });
 
-    res.json({ 
-      message: "Produk berhasil diperbarui", 
-      product: updatedProduct 
-    });
-
+    res.json({ message: "Produk berhasil diperbarui", updatedProduct });
   } catch (err) {
     console.error("Error updateProduct:", err);
     res.status(500).json({ message: "Gagal mengupdate produk", error: err.message });
   }
 };
 
-// Hapus Produk (Bisa oleh pemilik atau Admin)
+// 5. Hapus Produk (Oleh Pemilik atau Admin)
 exports.deleteProduct = async (req, res) => {
-  const { id } = req.params;
-  const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
+  try {
+    const { id } = req.params;
 
-  if (!product) return res.status(404).json({ message: "Produk tidak ditemukan" });
+    // Cari barangnya
+    const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
+    if (!product) return res.status(404).json({ message: "Produk tidak ditemukan" });
 
-  // Cek apakah pemilik atau admin
-  // if (product.userId !== req.user.id && req.user.role !== 'ADMIN') {
-  //   return res.status(403).json({ message: "Tidak punya akses" });
-  // }
+    // LOGIKA KEAMANAN: Izinkan jika dia pemiliknya ATAU dia seorang ADMIN
+    const isOwner = product.userId === req.user.id;
+    const isAdmin = req.user.role === 'admin';
 
-  await prisma.product.delete({ where: { id: parseInt(id) } });
-  res.json({ message: "Produk berhasil dihapus" });
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ 
+        message: "Anda tidak memiliki izin untuk menghapus produk ini" 
+      });
+    }
+
+    await prisma.product.delete({ where: { id: parseInt(id) } });
+    
+    res.json({ 
+      message: isAdmin ? "Produk dihapus oleh Admin" : "Produk berhasil Anda hapus" 
+    });
+
+  } catch (err) {
+    console.error("Error deleteProduct:", err);
+    res.status(500).json({ message: "Gagal menghapus produk" });
+  }
 };
