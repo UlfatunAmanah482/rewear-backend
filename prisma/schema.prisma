@@ -13,6 +13,7 @@ model User {
   password  String
   name      String
   phone     String
+  address   String
   products  Product[]
 }
 
@@ -23,6 +24,7 @@ model Product {
   price       Float
   image       String?
   category    String?
+  address     String
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())

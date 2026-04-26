@@ -37,9 +37,9 @@ exports.getProductById = async (req, res) => {
 
 // Tambah Produk
 exports.createProduct = async (req, res) => {
-  const { title, description, price, category, image } = req.body;
+  const { title, description, price, category, image, address } = req.body;
   const product = await prisma.product.create({
-    data: { title, description, price: parseFloat(price), category, image, userId: req.user.id }
+    data: { title, description, price: parseFloat(price), category, image, address, userId: req.user.id }
   });
   res.json(product);
 };

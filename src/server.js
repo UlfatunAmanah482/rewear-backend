@@ -8,8 +8,9 @@ const { getUser } = require('./controllers/userController');
 
 dotenv.config();
 const app = express();
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cors());
-app.use(express.json());
 
 // Routes Auth
 app.post('/api/register', register);

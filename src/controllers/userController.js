@@ -17,7 +17,9 @@ exports.getUser = async (req, res) => {
         id: true, 
         email: true, 
         name: true,
-        phone: true 
+        phone: true,
+        address: true,
+        products: true,
       }
     });
 
